@@ -87,7 +87,7 @@ def checkDiskSpace(oldStatus):
         logging.error("Diskspace is low! >{}% used".format(threshold))
         if oldStatus == "OK":
             sendNotification(1,"Diskspace is getting full","Diskspace is getting low is now {} % full.".format(percentage))
-            return "NOK"
+        return "NOK"
     
     if oldStatus == "NOK":
         logging.error("Diskspace is OK again")
@@ -108,7 +108,7 @@ def checkMemoryUsage(oldStatus):
         logging.error("Available memory is low! <{}% free".format(percentage))
         if oldStatus == "OK":
             sendNotification(1,"Available memory is low! <{}% free".format(percentage),"Available memory is low now {} % available.".format(percentage))
-            return "NOK"
+        return "NOK"
     
     if oldStatus == "NOK":
         logging.error("Memory usage is OK again")
@@ -125,6 +125,23 @@ def checkInternalIPChange(oldStatus):
 
     return current
 
+def checkTemperature(oldStatus):
+    threshold = 80
+    temp = subprocess.run(['sensors','-j'], stdout=subprocess.PIPE)
+    temp = json.loads(temp.stdout)
+    temp = temp["cpu_thermal-virtual-0"]["temp1"]["temp1_input"]
+    temp = int(temp)
+    if temp > threshold:
+        logging.error("CPU temperature is now {} degrees celcius".format(temp))
+        if oldStatus == "OK":
+            sendNotification(1,"CPU temperature is now {} degrees celcius".format(temp),"CPU temperature is going to high and CPU will be in throttle mode.")
+        return "NOK"
+
+    if oldStatus == "NOK":
+        logging.error("Temperature is restored again")
+        sendNotification(1,"Temperature is restored again","Temperature is now on {} degrees celcius".format(temp))
+
+    return "OK"
 
 
 def performCheck(func,oldStatus):
@@ -149,7 +166,8 @@ if __name__ == "__main__":
     vpnServer = "OK"
     diskSpace = "OK"
     ipAddress = os.popen('ip addr show eth0 | grep "\<inet\>" | awk \'{ print $2 }\' | awk -F "/" \'{ print $1 }\'').read().strip()
-    
+    temp = "OK"
+
     while True:
         logging.info("Starting new monitor round at {}".format(datetime.datetime.now()))
         
@@ -158,6 +176,7 @@ if __name__ == "__main__":
         diskSpace = performCheck(checkDiskSpace,diskSpace)
         ipAddress = performCheck(checkInternalIPChange,ipAddress)
         memoryUsage = performCheck(checkMemoryUsage,memoryUsage)
+        temp = performCheck(checkTemperature,temp)
             
         # Wait until next interval 
         time.sleep(interval)
